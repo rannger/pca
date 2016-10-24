@@ -3,7 +3,7 @@ LD=clang
 CFLAGS=-g 
 LDFLAGS=-g
 TARGET=matrix-mul
-OBJS=main.o matrix_operation.o average_image_vector.o pgm.o svd.o principal_component.o filelist1.o
+OBJS=main.o matrix_operation.o average_image_vector.o pgm.o svd.o principal_component.o filelist.o
 
 .PHONY: build
 

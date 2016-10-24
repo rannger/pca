@@ -145,7 +145,7 @@ int face_detection(char *file_name,int pictures_class,int distance_func_num)
                  for(i=0;i<r->col;i++)
                  {
                      for(j=0;j<r->col;j++)
-                         pricoms[i].eigenvectors->values[j]=fabs(v[i*r->col+j])>0.5?1:0;
+                         pricoms[i].eigenvectors->values[j]=fabs(v[i*r->col+j])>0.125?1:0;
                  
                      struct matrix* mat_tran=matrix_transpose(pricoms[i].eigenvectors);
                      if(mat_tran)
