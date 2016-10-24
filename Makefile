@@ -10,7 +10,7 @@ OBJS=main.o matrix_operation.o average_image_vector.o pgm.o svd.o principal_comp
 build: $(OBJS) $(TARGET)
 
 clean:
-	rm $(TARGET) $(OBJS)
+	rm $(TARGET) ./*.o
 %.o:%c
 	$(CC) $(CFLAGS) -o $@ $<
 
