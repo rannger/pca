@@ -31,9 +31,6 @@ typedef double (*distance_func)(struct matrix* matrix[]);
 static distance_func funcs[3]={euclidean_distance,camberra_distance,x_2_distance};
 char dir_path[128];
 
-//FDResult FaceDetection(BYTE *pFrame/*输入图像*/,int width/*图像宽度*/,
-//                       int height/*图像高度*/,SAColorSpace colorSpace/*颜色空间*/)
-//int main(int argc,char *argv[])
 int face_detection(char *file_name,int pictures_class,int distance_func_num)
 {
      int size=0;
