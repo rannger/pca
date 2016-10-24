@@ -233,7 +233,7 @@ int main(int argc,char *argv[])
     printf("picture class:");
 
     int record=face_detection(filename,10,1);
-    printf("\n%d-----%s\n",check_class(record),files[record-1]);
+    printf("%s\n",files[record-1]);
     return 0;
 }
 
@@ -389,13 +389,4 @@ double x_2_distance(struct matrix* matrixs[])
         value+=a/b;
     }
     return value;
-}
-
-int check_class(int param)
-{
-    int result;
-    if(param<0)
-        result=-1;
-    result=param/10;
-    return result;
 }
