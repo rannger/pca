@@ -34,7 +34,7 @@ char dir_path[128];
 //FDResult FaceDetection(BYTE *pFrame/*输入图像*/,int width/*图像宽度*/,
 //                       int height/*图像高度*/,SAColorSpace colorSpace/*颜色空间*/)
 //int main(int argc,char *argv[])
-int func(char *file_name,int pictures_class,int distance_func_num)
+int face_detection(char *file_name,int pictures_class,int distance_func_num)
 {
      int size=0;
      int retval;
@@ -235,7 +235,7 @@ int main(int argc,char *argv[])
     scanf("%s",filename);
     printf("picture class:");
 
-    int record=func(filename,10,1);
+    int record=face_detection(filename,10,1);
     printf("\n%d-----%s\n",check_class(record),files[record-1]);
     return 0;
 }
