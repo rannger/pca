@@ -126,7 +126,7 @@ int face_detection(char *file_name,int pictures_class,int distance_func_num)
              k=0;
              double* v=(double*)malloc(sizeof(double)*(r->row*r->row));
              double* u=(double*)malloc(sizeof(double)*(r->col*r->col));
-             memset(v,0,sizeof(double)*(r->row*r->row));
+             for (int i = 0;i<r->row*r->col;++i) v[i] = 0.0;
              double* result;
              double eps=0.000001;
              struct pricom *pricoms=(struct pricom*)malloc(sizeof(struct pricom)*r->row);
@@ -247,7 +247,7 @@ int picture_check(struct matrix* pictures[],const int count,struct matrix *matri
     struct matrix* check_matrix;
     
     result=0;
-    memset(matrix_y,0,sizeof(struct matrix*)*count);
+    for(int i = 0;i<count;++i) matrix_y[i] = NULL;
     check_y=NULL;
     matrix_u=NULL;
 

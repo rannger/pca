@@ -1,10 +1,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
+#include <assert.h>
+#include <errno.h>
+#include <sys/sysctl.h>
 #include "matrix_operation.h"
 
-/*ÉêÇë¾ØÕó,¾ØÕóµÄ¹¤³§·½·¨*/
-/*ÉêÇërow*colµÄ¾ØÕó,³É¹¦Ôò·µ»Ø¾ØÕóµÄµØÖ·,Ê§°ÜÔò·µ»ØNULL*/
+/*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½Ä¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½*/
+/*ï¿½ï¿½ï¿½ï¿½row*colï¿½Ä¾ï¿½ï¿½ï¿½,ï¿½É¹ï¿½ï¿½ò·µ»Ø¾ï¿½ï¿½ï¿½Äµï¿½Ö·,Ê§ï¿½ï¿½ï¿½ò·µ»ï¿½NULL*/
 struct matrix* matrix_alloc_and_init(int row,int col)
 /*struct matrix* matrix_alloc(int row,int col)*/
 {
@@ -13,7 +17,8 @@ struct matrix* matrix_alloc_and_init(int row,int col)
     {
         ptr->row=row;
         ptr->col=col;
-        memset(ptr->values,0,sizeof(ptr->values));
+        for (int i = 0;i<row*col;i++)
+            ptr->values[i] = 0;
     }
     return ptr;
 }
@@ -24,10 +29,11 @@ void matrix_release(struct matrix* matrix)
 }
 
 
+static struct matrix* matrixMultiplyInternal(struct matrix* left,struct matrix* right);
 
-/*¾ØÕó³Ë·¨*/
-/*³É¹¦Ôò·µ»Ø0,Ê§°ÜÔò·µ»Ø-1*/
-/*matrixsÊÇÒªÏà³ËµÄ¾ØÕó×é³ÉµÄÊý×é,resultÊÇÏà³ËµÄ½á¹ûµÄÖ¸ÕëµÄÖ¸Õë*/
+/*ï¿½ï¿½ï¿½ï¿½Ë·ï¿½*/
+/*ï¿½É¹ï¿½ï¿½ò·µ»ï¿½0,Ê§ï¿½ï¿½ï¿½ò·µ»ï¿½-1*/
+/*matrixsï¿½ï¿½Òªï¿½ï¿½ËµÄ¾ï¿½ï¿½ï¿½ï¿½ï¿½Éµï¿½ï¿½ï¿½ï¿½ï¿½,resultï¿½ï¿½ï¿½ï¿½ËµÄ½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½*/
 int matrix_multiply(struct matrix* matrixs[],struct matrix** result)
 {
     int res;
@@ -35,6 +41,7 @@ int matrix_multiply(struct matrix* matrixs[],struct matrix** result)
         res=-1;
     else
     {
+        /*
         struct matrix* matrix=matrix_alloc_and_init(matrixs[0]->row,matrixs[1]->col);
         if(!matrix)
             res=-1;
@@ -58,14 +65,132 @@ int matrix_multiply(struct matrix* matrixs[],struct matrix** result)
             res=0;
             *result=matrix;
         }
+        */
+        *result = matrixMultiplyInternal(matrixs[0],matrixs[1]);
+        res = 0;
     }
     return res;
 }
 
-/*¾ØÕó¼Ó·ÖºÍ¼õ·¨µÄ¹²ÓÐËã·¨*/
-/*³É¹¦Ôò·µ»Ø0,Ê§°ÜÔò·µ»Ø-1*/
-/*matrixsÊÇÒªÏà¼õµÄ¾ØÕó×é³ÉµÄÊý×é,resultÊÇÏà¼õµÄ½á¹ûµÄÖ¸ÕëµÄÖ¸Õë,flagÊÇÔËËãÑ¡Ôñ±êÖ¾,0ÊÇ¼õ·¨,1ÊÇ¼Ó·¨*/
-/*¸Ãº¯ÊýÊÇ±¾µØº¯Êý*/
+typedef struct matrixCalcParam
+{
+    struct matrix* left;
+    struct matrix* right;
+    struct matrix* matrix;
+    int32_t i;
+    int32_t j;
+}MatrixCalcParam;
+
+struct ThreadParam
+{
+    MatrixCalcParam** params;
+    int32_t index;
+    pthread_mutex_t mutex;
+} g_threadParam = {
+    NULL,
+    -1,
+    PTHREAD_MUTEX_INITIALIZER
+};
+
+
+static void matrixCalcRoutine(MatrixCalcParam* param);
+
+static void* threadRoutine(void* param) 
+{
+    do {
+        int err = pthread_mutex_trylock(&(g_threadParam.mutex));
+        if (EBUSY==err) {
+            sched_yield();
+            continue;
+        } else if (EINVAL==err) {
+            assert(0);
+        }
+        MatrixCalcParam* param = g_threadParam.params[g_threadParam.index];
+        if(NULL==param) {
+            pthread_mutex_unlock(&(g_threadParam.mutex));
+            break;
+        }
+        g_threadParam.index+=1;
+        pthread_mutex_unlock(&(g_threadParam.mutex));
+        matrixCalcRoutine(param);
+    } while(1);
+
+    return NULL;
+}
+
+static void matrixCalcRoutine(MatrixCalcParam* param)
+{
+    MatrixCalcParam* p = param;
+    int32_t value = 0;
+    int count=p->left->col;
+    int row=p->left->row;
+    int col=p->right->col;
+    for(int index=0;index<count;index++) {
+         value+=p->left->values[p->i*count+index]*p->right->values[index*col+p->j];
+    }
+    p->matrix->values[p->i*col+p->j]=value;
+}
+
+int32_t countOfCPU(void)
+{
+    int32_t ncpu = 0;
+    size_t len = sizeof(ncpu);
+    sysctlbyname("hw.ncpu",&ncpu,&len,NULL,0);
+    return ncpu;
+}
+
+
+static struct matrix* matrixMultiplyInternal(struct matrix* left,struct matrix* right)
+{
+    struct matrix* matrix=matrix_alloc_and_init(left->row,right->col);
+    const int threadCount = countOfCPU()*2;
+    pthread_t *pid = NULL;
+    pid = (pthread_t *)malloc(sizeof(pthread_t)*threadCount);
+    MatrixCalcParam** params = (MatrixCalcParam**)malloc(sizeof(MatrixCalcParam*)*(matrix->row*matrix->col+1));
+
+    for(int i=0;i<matrix->row;i++) {
+        for(int j=0;j<matrix->col;j++) {
+            int index = i*matrix->col+j;
+            MatrixCalcParam* p = (MatrixCalcParam*)malloc(sizeof(MatrixCalcParam));
+            p->left = left;
+            p->right = right;
+            p->matrix = matrix;
+            p->i = i;
+            p->j = j;
+            params[index] = p;
+       }
+    }
+    params[matrix->row*matrix->col] = NULL;
+    g_threadParam.params = params;
+    g_threadParam.index = 0;
+
+    for(int i=0;i<threadCount;++i) {
+        int err = pthread_create(pid+i,NULL,threadRoutine,NULL);
+        assert(err==0);
+    }
+
+    for(int i=0;i<threadCount;++i) {
+        void* retval = NULL;
+        pthread_join(pid[i],&retval);
+    }
+
+    for(int i = 0;i<matrix->row*matrix->col;++i) 
+        free(params[i]);
+    free(params);
+    free(pid);
+    params = NULL;
+
+    g_threadParam.params = NULL;
+    g_threadParam.index = -1;
+    return matrix;
+}
+
+
+
+/*ï¿½ï¿½ï¿½ï¿½Ó·ÖºÍ¼ï¿½ï¿½ï¿½ï¿½Ä¹ï¿½ï¿½ï¿½ï¿½ã·¨*/
+/*ï¿½É¹ï¿½ï¿½ò·µ»ï¿½0,Ê§ï¿½ï¿½ï¿½ò·µ»ï¿½-1*/
+/*matrixsï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Ä¾ï¿½ï¿½ï¿½ï¿½ï¿½Éµï¿½ï¿½ï¿½ï¿½ï¿½,resultï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½,flagï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½Ö¾,0ï¿½Ç¼ï¿½ï¿½ï¿½,1ï¿½Ç¼Ó·ï¿½*/
+/*ï¿½Ãºï¿½ï¿½ï¿½ï¿½Ç±ï¿½ï¿½Øºï¿½ï¿½ï¿½*/
 int matrix_add_sub_common(struct matrix* matrixs[],struct matrix** result,int flag)
 {
     int res;
@@ -99,8 +224,8 @@ int matrix_add_sub_common(struct matrix* matrixs[],struct matrix** result,int fl
     return res;
 }
 
-/*¾ØÕó×ªÖÃ*/
-/*³É¹¦Ôò·µ»Ø½á¹û,Ê§°ÜÔò·µ»ØNULL*/
+/*ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½*/
+/*ï¿½É¹ï¿½ï¿½ò·µ»Ø½ï¿½ï¿½,Ê§ï¿½ï¿½ï¿½ò·µ»ï¿½NULL*/
 struct matrix* matrix_transpose(struct matrix* matrix)
 {
     struct matrix* result=matrix_alloc_and_init(matrix->col,matrix->row);
@@ -116,17 +241,17 @@ struct matrix* matrix_transpose(struct matrix* matrix)
     return result;
 }
 
-/*¾ØÕó¼Ó·¨*/
-/*³É¹¦Ôò·µ»Ø0,Ê§°ÜÔò·µ»Ø-1*/
-/*matrixsÊÇÒªÏà¼ÓµÄ¾ØÕó×é³ÉµÄÊý×é,resultÊÇÏà¼ÓµÄ½á¹ûµÄÖ¸ÕëµÄÖ¸Õë*/
+/*ï¿½ï¿½ï¿½ï¿½Ó·ï¿½*/
+/*ï¿½É¹ï¿½ï¿½ò·µ»ï¿½0,Ê§ï¿½ï¿½ï¿½ò·µ»ï¿½-1*/
+/*matrixsï¿½ï¿½Òªï¿½ï¿½ÓµÄ¾ï¿½ï¿½ï¿½ï¿½ï¿½Éµï¿½ï¿½ï¿½ï¿½ï¿½,resultï¿½ï¿½ï¿½ï¿½ÓµÄ½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½*/
 int matrix_add(struct matrix* matrixs[],struct matrix** result)
 {
     return matrix_add_sub_common(matrixs,result,1);    
 }
 
-/*¾ØÕó¼õ·¨*/
-/*³É¹¦Ôò·µ»Ø0,Ê§°ÜÔò·µ»Ø-1*/
-/*matrixsÊÇÒªÏà¼õµÄ¾ØÕó×é³ÉµÄÊý×é,resultÊÇÏà¼õµÄ½á¹ûµÄÖ¸ÕëµÄÖ¸Õë*/
+/*ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½*/
+/*ï¿½É¹ï¿½ï¿½ò·µ»ï¿½0,Ê§ï¿½ï¿½ï¿½ò·µ»ï¿½-1*/
+/*matrixsï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½Ä¾ï¿½ï¿½ï¿½ï¿½ï¿½Éµï¿½ï¿½ï¿½ï¿½ï¿½,resultï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä½ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½*/
 int matrix_sub(struct matrix* matrixs[],struct matrix** result)
 {
     return matrix_add_sub_common(matrixs,result,0);
