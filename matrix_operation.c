@@ -12,11 +12,12 @@
 struct matrix* matrix_alloc_and_init(int row,int col)
 /*struct matrix* matrix_alloc(int row,int col)*/
 {
-    struct matrix* ptr=(struct matrix*)malloc(sizeof(int)*2+sizeof(unsigned int)*(row*col));
+    struct matrix* ptr=(struct matrix*)malloc(sizeof(struct matrix));
     if(ptr)
     {
         ptr->row=row;
         ptr->col=col;
+        ptr->values = (uint64_t*)malloc(sizeof(uint64_t)*(row*col));
         for (int i = 0;i<row*col;i++)
             ptr->values[i] = 0;
     }
@@ -25,6 +26,8 @@ struct matrix* matrix_alloc_and_init(int row,int col)
 
 void matrix_release(struct matrix* matrix)
 {
+    if (matrix->values) 
+        free(matrix->values);
     free(matrix);
 }
 
@@ -143,9 +146,8 @@ int32_t countOfCPU(void)
 static struct matrix* matrixMultiplyInternal(struct matrix* left,struct matrix* right)
 {
     struct matrix* matrix=matrix_alloc_and_init(left->row,right->col);
-    const int threadCount = countOfCPU()*2;
-    pthread_t *pid = NULL;
-    pid = (pthread_t *)malloc(sizeof(pthread_t)*threadCount);
+    const int THREADCOUNT = countOfCPU()*2;
+    pthread_t pid[THREADCOUNT];
     MatrixCalcParam** params = (MatrixCalcParam**)malloc(sizeof(MatrixCalcParam*)*(matrix->row*matrix->col+1));
 
     for(int i=0;i<matrix->row;i++) {
@@ -164,12 +166,12 @@ static struct matrix* matrixMultiplyInternal(struct matrix* left,struct matrix* 
     g_threadParam.params = params;
     g_threadParam.index = 0;
 
-    for(int i=0;i<threadCount;++i) {
+    for(int i=0;i<THREADCOUNT;++i) {
         int err = pthread_create(pid+i,NULL,threadRoutine,NULL);
         assert(err==0);
     }
 
-    for(int i=0;i<threadCount;++i) {
+    for(int i=0;i<THREADCOUNT;++i) {
         void* retval = NULL;
         pthread_join(pid[i],&retval);
     }
@@ -177,7 +179,6 @@ static struct matrix* matrixMultiplyInternal(struct matrix* left,struct matrix* 
     for(int i = 0;i<matrix->row*matrix->col;++i) 
         free(params[i]);
     free(params);
-    free(pid);
     params = NULL;
 
     g_threadParam.params = NULL;

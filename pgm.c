@@ -10,8 +10,8 @@
 /********************************************/
 static void hist_Eq(unsigned char *pImagedata, long width, long height);
 
-/*´ÓÍ¼Æ¬ÎÄ¼þÖÐ¶Á³öÊý¾Ý²¢Ìî³äpgm_header½á¹¹*/
-/*³É¹¦·µ»Ø0,Ê§°Ü·µ»Ø-1*/
+/*ï¿½ï¿½Í¼Æ¬ï¿½Ä¼ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý²ï¿½ï¿½ï¿½ï¿½pgm_headerï¿½á¹¹*/
+/*ï¿½É¹ï¿½ï¿½ï¿½ï¿½ï¿½0,Ê§ï¿½Ü·ï¿½ï¿½ï¿½-1*/
 int fill_pgm_header(char* path,struct pgm_header** header)
 {
     int result;
@@ -88,18 +88,19 @@ int fill_pgm_header(char* path,struct pgm_header** header)
     
     return result;
 }
-/*Ïú»Ùpgm_header½á¹¹*/
+/*ï¿½ï¿½ï¿½ï¿½pgm_headerï¿½á¹¹*/
 void release_pgm_header(struct pgm_header* header)
 {
     if(header)
     {
-        free(header->buffer);
+        if (header->buffer)
+            free(header->buffer);
         free(header);
     }
 }
 
-/*pgm_header½á¹¹µÄ¹¤³§·½·¨*/
-/*³É¹¦·µ»Ø¶ÔÏóÖ¸Õë,Ê§°Ü·µ»ØNULL*/
+/*pgm_headerï¿½á¹¹ï¿½Ä¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½*/
+/*ï¿½É¹ï¿½ï¿½ï¿½ï¿½Ø¶ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½,Ê§ï¿½Ü·ï¿½ï¿½ï¿½NULL*/
 struct pgm_header* pgm_header_alloc_and_init()
 {
     struct pgm_header* result;
@@ -118,7 +119,7 @@ struct pgm_header* pgm_header_alloc_and_init()
     return result;
 }
 /*****************************************************************/
-/*  ¶ÔÊäÈëÊý¾ÝËÄÉáÎåÈë£¬È¡Õû¡£                                   */
+/*  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë£¬È¡ï¿½ï¿½ï¿½ï¿½                                   */
 /*****************************************************************/
 int rounding( double x)
 {
@@ -150,7 +151,7 @@ static void hist_Eq(unsigned char *pImagedata, long width, long height)
 
    n = width * height;
 
-   //1.±éÀúÍ¼Ïñ»ñÈ¡Í¼ÏñÖ±·½Í¼
+   //1.ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½È¡Í¼ï¿½ï¿½Ö±ï¿½ï¿½Í¼
    for(i=0;i<height;i++)
    {
 	   for(j=0;j<width;j++)
@@ -166,7 +167,7 @@ static void hist_Eq(unsigned char *pImagedata, long width, long height)
 	   s_hist_eq[i]=(double)state_hst[i]/(double)n;
 
 
-	//2.»ñÈ¡ÊäÈëÍ¼ÏñµÄÀÛ»ýÖ±·½Í¼
+	//2.ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½Û»ï¿½Ö±ï¿½ï¿½Í¼
    sum_of_hist[0] = s_hist_eq[0];
 
    for (i=1;i<256;i++)        
@@ -174,7 +175,7 @@ static void hist_Eq(unsigned char *pImagedata, long width, long height)
       sum_of_hist[i] = sum_of_hist[i-1] + s_hist_eq[i];
    }
 
-   //3.ÓÉÀÛ»ýÖ±·½Í¼È·¶¨¾ùºâ»¯ºóÍ¼ÏñµÄÏñËØÖµ
+   //3.ï¿½ï¿½ï¿½Û»ï¿½Ö±ï¿½ï¿½Í¼È·ï¿½ï¿½ï¿½ï¿½ï¿½â»¯ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
 
    for(i=0;i<height;i++)
    {

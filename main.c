@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <assert.h>
+#include <pthread.h>
 #include "average_image_vector.h"
 #include "pgm.h"
 #include "svd.h"
@@ -31,6 +33,60 @@ typedef double (*distance_func)(struct matrix* matrix[]);
 static distance_func funcs[3]={euclidean_distance,camberra_distance,x_2_distance};
 char dir_path[128];
 
+struct ReadFileParam {
+    int32_t index;
+    pthread_mutex_t mutex;
+    struct pgm_header** header;
+    int32_t size;
+} readFileParam = {
+    0,
+    PTHREAD_MUTEX_INITIALIZER,
+    NULL,
+    0,
+};
+
+void* readFileRotiue(void* param)
+{
+    do {
+        pthread_mutex_lock(&readFileParam.mutex);
+        int index = readFileParam.index;
+        if (index>=readFileParam.size) {
+            pthread_mutex_unlock(&readFileParam.mutex);
+            break;
+        }
+        readFileParam.index+=1;
+        pthread_mutex_unlock(&readFileParam.mutex);
+        char paths[128];
+        strcpy(paths,dir_path);
+        strcat(paths,files[index]);
+        int err = fill_pgm_header((char*)paths,readFileParam.header+index);
+        if(err<0) assert(0);
+    } while(1);
+
+    return NULL;
+}
+
+int32_t countOfCPU(void);
+void readFiles(struct pgm_header* header,int size)
+{
+    readFileParam.size = size;
+    readFileParam.header = header;
+    const int THREADCOUNT = countOfCPU()*2;
+    pthread_t pid[THREADCOUNT];
+    for(int i=0;i<THREADCOUNT;++i) {
+        int err = pthread_create(&pid[i],NULL,readFileRotiue,NULL);
+        assert(err==0);
+    }
+
+    for(int i=0;i<THREADCOUNT;++i) {
+        void* retval = NULL;
+        pthread_join(pid[i],&retval);
+    }
+
+    readFileParam.size = 0;
+    readFileParam.header = NULL;
+}
+
 int face_detection(char *file_name,int pictures_class,int distance_func_num)
 {
      int size=0;
@@ -38,31 +94,16 @@ int face_detection(char *file_name,int pictures_class,int distance_func_num)
      struct matrix* r=NULL;
      struct matrix* x=NULL;
      retval=-1;
-     for(size=0;files[size];size++)
-         continue;
+     size = sizeof(files)/sizeof(char*);
      const int SIZE=size-1;
 
-     struct pgm_header* header[SIZE];
+     struct pgm_header* header[sizeof(files)/sizeof(char*)-1] = {NULL};
      
-     int index=0;
-
-     for(index=0;index<SIZE;index++)
-         header[index]=NULL;
      /*读取文件数据*/
      /*训练集中的数据都会填充到pgm_header结构体中*/
-     for(index=0;index<SIZE;index++)
-     {
-         char paths[128];
-         strcpy(paths,dir_path);
-         strcat(paths,files[index]);
-         if(fill_pgm_header((char*)paths,&header[index])<0)
-         {
-             for(index=0;index<SIZE;index++)
-                 release_pgm_header(header[index]);
-             exit(-1);
-         }
-     }
+    readFiles(header,SIZE); 
      
+     int index=0;
      struct matrix* pictures[SIZE];
      for(index=0;index<SIZE;index++)
          pictures[index]=NULL;
@@ -70,7 +111,7 @@ int face_detection(char *file_name,int pictures_class,int distance_func_num)
      /*矩阵数据位于pictures集合中*/
      for(index=0;index<SIZE;index++)
      {
-         pictures[index]=matrix_alloc_and_init(1,header[index]->width*header[index]->height);
+         pictures[index]=matrix_alloc_and_init(header[index]->width*header[index]->height,1);
          if(!pictures[index])
          {
              for(index=0;index<SIZE;index++)
@@ -79,22 +120,8 @@ int face_detection(char *file_name,int pictures_class,int distance_func_num)
                  matrix_release(pictures[index]);
              exit(-1);
          }
-         int i;
-         for(i=0;i<pictures[index]->row*pictures[index]->col;i++)
+        for(int i=0;i<pictures[index]->row*pictures[index]->col;i++)
              pictures[index]->values[i]=header[index]->buffer[i];
-             
-         
-         struct matrix* res=matrix_transpose(pictures[index]);
-         if(res)
-         {
-             matrix_release(pictures[index]);
-             pictures[index]=res;
-         }
-         else
-         {
-             puts("\nwarning:no memory.\n");
-             exit(-1);
-         }
      }
      
 

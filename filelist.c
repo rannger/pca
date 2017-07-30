@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include "filelist.h"
-
-char *files[]={
+char* files[401]={
 "s0101.pgm",
 "s0102.pgm",
 "s0103.pgm",
@@ -402,6 +401,5 @@ char *files[]={
 "s4008.pgm",
 "s4009.pgm",
 "s4010.pgm",
-
 NULL
 };
